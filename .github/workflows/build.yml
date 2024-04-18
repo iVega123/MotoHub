@@ -28,8 +28,8 @@ jobs:
       - name: SonarScanner for .NET with pull request decoration support
         uses: highbyte/sonarscan-dotnet@v2.3.2
         with:
-          sonarProjectKey: iVega123_AuthGate
-          sonarProjectName: AuthGate
+          sonarProjectKey: iVega123_MotoHub
+          sonarProjectName: MotoHub
           sonarOrganization: ivega123
           dotnetTestArguments: '--logger trx --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover'
           sonarBeginArguments: /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx" /d:sonar.coverage.exclusions="**/Migrations/*" /d:sonar.exclusions="**/Migrations/*"
