@@ -12,7 +12,6 @@ namespace MotoHub.Controllers
     {
         private readonly IMotorcycleService _motorcycleService;
 
-
         private readonly ILogger<MotorcyclesController> _logger;
 
         public MotorcyclesController(IMotorcycleService motorcycleService, ILogger<MotorcyclesController> logger)
@@ -21,6 +20,8 @@ namespace MotoHub.Controllers
             _logger = logger;
         }
 
+        [Authorize]
+        [ServiceFilter(typeof(AdminAuthorizationFilter))]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -29,13 +30,12 @@ namespace MotoHub.Controllers
             return Ok(motorcycles);
         }
 
-        [Authorize]
         [ServiceFilter(typeof(AdminAuthorizationFilter))]
         [HttpGet("{licensePlate}")]
-        public IActionResult GetByLicensePlate(string licensePlate)
+        public async Task<IActionResult> GetByLicensePlateAsync(string licensePlate)
         {
             _logger.LogInformation("Fetching motorcycle by license plate: {LicensePlate}", licensePlate);
-            var motorcycle = _motorcycleService.GetMotorcycleByLicensePlate(licensePlate);
+            var motorcycle = await _motorcycleService.GetMotorcycleByLicensePlateAsync(licensePlate);
             if (motorcycle == null)
             {
                 _logger.LogWarning("Motorcycle with license plate {LicensePlate} not found.", licensePlate);
@@ -47,7 +47,7 @@ namespace MotoHub.Controllers
         [Authorize]
         [ServiceFilter(typeof(AdminAuthorizationFilter))]
         [HttpPost]
-        public IActionResult Create(MotorcycleDTO motorcycle)
+        public IActionResult Create([FromBody]MotorcycleDTO motorcycle)
         {
             _logger.LogInformation("Creating motorcycle with license plate {LicensePlate}.", motorcycle.LicensePlate);
             if (_motorcycleService.LicensePlateExists(motorcycle.LicensePlate))
@@ -57,41 +57,43 @@ namespace MotoHub.Controllers
             }
 
             _motorcycleService.CreateMotorcycle(motorcycle);
-            return CreatedAtAction(nameof(GetByLicensePlate), new { licensePlate = motorcycle.LicensePlate }, motorcycle);
+            return Ok("Created!");
         }
 
         [Authorize]
         [ServiceFilter(typeof(AdminAuthorizationFilter))]
         [HttpPut("{licensePlate}")]
-        public IActionResult Update(string licensePlate, MotorcycleDTO motorcycle)
+        public async Task<IActionResult> Update(string licensePlate, string newLicencePlate)
         {
             _logger.LogInformation("Updating motorcycle with license plate {LicensePlate}.", licensePlate);
-            var existingMotorcycle = _motorcycleService.GetMotorcycleByLicensePlate(licensePlate);
+            var existingMotorcycle = await _motorcycleService.GetMotorcycleByLicensePlateAsync(licensePlate);
             if (existingMotorcycle == null)
             {
                 _logger.LogWarning("Motorcycle with license plate {LicensePlate} not found.", licensePlate);
                 return NotFound();
             }
 
-            _motorcycleService.UpdateMotorcycle(licensePlate, motorcycle);
+            await _motorcycleService.UpdateMotorcycleAsync(licensePlate, newLicencePlate);
             return NoContent();
         }
 
         [Authorize]
         [ServiceFilter(typeof(AdminAuthorizationFilter))]
         [HttpDelete("{licensePlate}")]
-        public IActionResult Delete(string licensePlate)
+        public async Task<IActionResult> Delete(string licensePlate)
         {
             _logger.LogInformation("Deleting motorcycle with license plate {LicensePlate}.", licensePlate);
-            var existingMotorcycle = _motorcycleService.GetMotorcycleByLicensePlate(licensePlate);
-            if (existingMotorcycle == null)
-            {
-                _logger.LogWarning("Motorcycle with license plate {LicensePlate} not found.", licensePlate);
-                return NotFound();
-            }
 
-            _motorcycleService.DeleteMotorcycle(licensePlate);
-            return NoContent();
+            var result = await _motorcycleService.DeleteMotorcycle(licensePlate);
+            if(result.Success)
+            {
+                return Ok("Deleted Successfully");
+            
+            } else {
+                
+                return BadRequest(result.Message); 
+            }
+            
         }
     }
 }

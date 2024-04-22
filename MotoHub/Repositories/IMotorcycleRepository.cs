@@ -5,11 +5,11 @@ namespace MotoHub.Repositories
     public interface IMotorcycleRepository
     {
         IEnumerable<Motorcycle> GetAll();
-        Motorcycle? GetById(int id);
+        Motorcycle? GetById(string id);
         void Add(Motorcycle motorcycle);
         void Update(Motorcycle motorcycle);
-        void Delete(int id);
+        void Delete(string id);
         bool LicensePlateExists(string licensePlate);
-        Motorcycle? GetByLicensePlate(string licensePlate);
+        Task<Motorcycle?> GetByLicensePlateAsync(string licensePlate);
     }
 }

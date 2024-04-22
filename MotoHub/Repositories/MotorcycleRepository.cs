@@ -18,7 +18,7 @@ namespace MotoHub.Repositories
             return _context.Motorcycles.ToList();
         }
 
-        public Motorcycle? GetById(int id)
+        public Motorcycle? GetById(string id)
         {
             return _context.Motorcycles.Find(id);
         }
@@ -35,7 +35,7 @@ namespace MotoHub.Repositories
             _context.SaveChanges();
         }
 
-        public void Delete(int id)
+        public void Delete(string id)
         {
             var motorcycle = _context.Motorcycles.Find(id);
             if (motorcycle == null)
@@ -51,9 +51,9 @@ namespace MotoHub.Repositories
             return _context.Motorcycles.Any(m => m.LicensePlate == licensePlate);
         }
 
-        public Motorcycle? GetByLicensePlate(string licensePlate)
+        public async Task<Motorcycle?> GetByLicensePlateAsync(string licensePlate)
         {
-            return _context.Motorcycles.FirstOrDefault(m => m.LicensePlate == licensePlate);
+            return await _context.Motorcycles.FirstOrDefaultAsync(m => m.LicensePlate == licensePlate);
         }
     }
 }

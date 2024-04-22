@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using MotoHub.Controllers;
 using MotoHub.DTOs;
+using MotoHub.Entities;
 using MotoHub.Services;
 using System.Security.Claims;
 
@@ -28,19 +29,22 @@ namespace MotoHubTests.Unit.Controllers
         }
 
         [Fact]
-        public void GetByLicensePlate_WithExistingPlate_ReturnsOkObjectResult()
+        public async Task GetByLicensePlate_WithExistingPlate_ReturnsOkObjectResult()
         {
             // Arrange
             var motorcycleServiceMock = new Mock<IMotorcycleService>();
             var mockLogger = new Mock<ILogger<MotorcyclesController>>();
-            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlate("ABC123")).Returns(new MotorcycleDTO() { LicensePlate = "test-584" });
+            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlateAsync("ABC123"))
+                                 .ReturnsAsync(new MotorcycleDTO { LicensePlate = "ABC123" });
             var controller = new MotorcyclesController(motorcycleServiceMock.Object, mockLogger.Object);
 
             // Act
-            var result = controller.GetByLicensePlate("ABC123");
+            var result = await controller.GetByLicensePlateAsync("ABC123");
 
             // Assert
-            Assert.IsType<OkObjectResult>(result);
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            var motorcycle = Assert.IsType<MotorcycleDTO>(okResult.Value);
+            Assert.Equal("ABC123", motorcycle.LicensePlate);
         }
 
         [Fact]
@@ -57,39 +61,45 @@ namespace MotoHubTests.Unit.Controllers
             var result = controller.Create(motorcycle);
 
             // Assert
-            Assert.IsType<CreatedAtActionResult>(result);
+            Assert.IsType<OkObjectResult>(result);
         }
 
         [Fact]
-        public void Update_WithExistingLicensePlate_ReturnsNoContentResult()
+        public async Task Update_WithExistingLicensePlate_ReturnsNoContentResult()
         {
             // Arrange
             var motorcycleServiceMock = new Mock<IMotorcycleService>();
             var mockLogger = new Mock<ILogger<MotorcyclesController>>();
-            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlate("ABC123")).Returns(new MotorcycleDTO() { LicensePlate = "test-584" });
+            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlateAsync("ABC123"))
+                                 .ReturnsAsync(new MotorcycleDTO { LicensePlate = "test-584" });
+            motorcycleServiceMock.Setup(service => service.UpdateMotorcycleAsync("ABC123", "XYZ987"))
+                                 .Returns(Task.CompletedTask);  // Assuming the update method is void async
+
             var controller = new MotorcyclesController(motorcycleServiceMock.Object, mockLogger.Object);
 
             // Act
-            var result = controller.Update("ABC123", new MotorcycleDTO() { LicensePlate = "A" });
+            var result = await controller.Update("ABC123", "XYZ987");
 
             // Assert
             Assert.IsType<NoContentResult>(result);
         }
 
         [Fact]
-        public void Delete_WithExistingLicensePlate_ReturnsNoContentResult()
+        public async Task Delete_WithExistingLicensePlate_ReturnsOkResult()
         {
             // Arrange
             var motorcycleServiceMock = new Mock<IMotorcycleService>();
             var mockLogger = new Mock<ILogger<MotorcyclesController>>();
-            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlate("ABC123")).Returns(new MotorcycleDTO() { LicensePlate = "test-584" });
+            motorcycleServiceMock.Setup(service => service.DeleteMotorcycle("ABC123"))
+                                 .ReturnsAsync(new OperationResult { Success = true, Message = "Deleted Successfully" });
             var controller = new MotorcyclesController(motorcycleServiceMock.Object, mockLogger.Object);
 
             // Act
-            var result = controller.Delete("ABC123");
+            var result = await controller.Delete("ABC123");
 
             // Assert
-            Assert.IsType<NoContentResult>(result);
+            var okResult = Assert.IsType<OkObjectResult>(result);
+            Assert.Equal("Deleted Successfully", okResult.Value);
         }
 
         [Fact]
@@ -110,35 +120,37 @@ namespace MotoHubTests.Unit.Controllers
         }
 
         [Fact]
-        public void Update_NonExistingLicensePlate_ReturnsNotFoundResult()
+        public async Task Update_NonExistingLicensePlate_ReturnsNotFoundResult()
         {
             // Arrange
             var motorcycleServiceMock = new Mock<IMotorcycleService>();
             var mockLogger = new Mock<ILogger<MotorcyclesController>>();
-            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlate("XYZ789")).Returns((MotorcycleDTO)null);
+            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlateAsync("XYZ789")).ReturnsAsync((MotorcycleDTO)null);
             var controller = new MotorcyclesController(motorcycleServiceMock.Object, mockLogger.Object);
 
             // Act
-            var result = controller.Update("XYZ789", new MotorcycleDTO() { LicensePlate = "test-584" });
+            var result = await controller.Update("XYZ789", "test-584");
 
             // Assert
             Assert.IsType<NotFoundResult>(result);
         }
 
         [Fact]
-        public void Delete_NonExistingLicensePlate_ReturnsNotFoundResult()
+        public async Task Delete_NonExistingLicensePlate_ReturnsNotFoundResult()
         {
             // Arrange
             var motorcycleServiceMock = new Mock<IMotorcycleService>();
             var mockLogger = new Mock<ILogger<MotorcyclesController>>();
-            motorcycleServiceMock.Setup(service => service.GetMotorcycleByLicensePlate("XYZ789")).Returns((MotorcycleDTO)null);
+            motorcycleServiceMock.Setup(service => service.DeleteMotorcycle("XYZ789"))
+                                 .ReturnsAsync(new OperationResult { Success = false, Message = "Motorcycle not found" });
             var controller = new MotorcyclesController(motorcycleServiceMock.Object, mockLogger.Object);
 
             // Act
-            var result = controller.Delete("XYZ789");
+            var result = await controller.Delete("XYZ789");
 
             // Assert
-            Assert.IsType<NotFoundResult>(result);
+            var notFoundResult = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Equal("Motorcycle not found", notFoundResult.Value);
         }
 
         [Fact]
@@ -167,11 +179,12 @@ namespace MotoHubTests.Unit.Controllers
         }
 
         [Fact]
-        public void GetByLicensePlate_AuthorizedUser_ReturnsOkResult()
+        public async Task GetByLicensePlate_AuthorizedUser_ReturnsOkResult()
         {
             // Arrange
             var mockService = new Mock<IMotorcycleService>();
-            mockService.Setup(service => service.GetMotorcycleByLicensePlate(It.IsAny<string>())).Returns(new MotorcycleDTO { LicensePlate = "ABC123", Model = "Honda", Year = 2020 });
+            mockService.Setup(service => service.GetMotorcycleByLicensePlateAsync(It.IsAny<string>()))
+                       .ReturnsAsync(new MotorcycleDTO { LicensePlate = "ABC123", Model = "Honda", Year = 2020 });
             var mockLogger = new Mock<ILogger<MotorcyclesController>>();
             var controller = new MotorcyclesController(mockService.Object, mockLogger.Object);
             controller.ControllerContext = new ControllerContext
@@ -180,15 +193,15 @@ namespace MotoHubTests.Unit.Controllers
                 {
                     User = new ClaimsPrincipal(new ClaimsIdentity(new Claim[]
                     {
-                        new Claim(ClaimTypes.Name, "TestUser"),
-                        new Claim(ClaimTypes.Email, "test@example.com"),
-                        new Claim(ClaimTypes.Role, "Admin")
+                new Claim(ClaimTypes.Name, "TestUser"),
+                new Claim(ClaimTypes.Email, "test@example.com"),
+                new Claim(ClaimTypes.Role, "Admin")
                     }, "mock"))
                 }
             };
 
             // Act
-            var result = controller.GetByLicensePlate("ABC123");
+            var result = await controller.GetByLicensePlateAsync("ABC123");
 
             // Assert
             var okResult = Assert.IsType<OkObjectResult>(result);
