@@ -1,14 +1,15 @@
 ﻿using MotoHub.DTOs;
+using MotoHub.Entities;
 
 namespace MotoHub.Services
 {
     public interface IMotorcycleService
     {
         IEnumerable<MotorcycleDTO> GetAllMotorcycles();
-        MotorcycleDTO GetMotorcycleByLicensePlate(string licensePlate);
+        Task<MotorcycleDTO> GetMotorcycleByLicensePlateAsync(string licensePlate);
         void CreateMotorcycle(MotorcycleDTO motorcycleDto);
-        void UpdateMotorcycle(string licensePlate, MotorcycleDTO motorcycleDto);
-        void DeleteMotorcycle(string licensePlate);
+        Task UpdateMotorcycleAsync(string licensePlate, string newLicencePlate);
+        Task<OperationResult> DeleteMotorcycle(string licensePlate);
         bool LicensePlateExists(string licensePlate);
     }
 }
