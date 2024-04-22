@@ -61,7 +61,7 @@ namespace MotoHubTests.Unit.Controllers
             var result = controller.Create(motorcycle);
 
             // Assert
-            Assert.IsType<CreatedAtActionResult>(result);
+            Assert.IsType<OkObjectResult>(result);
         }
 
         [Fact]

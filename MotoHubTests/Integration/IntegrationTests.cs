@@ -30,7 +30,9 @@ namespace MotoHubTests.Integration
         {
             // Arrange
             var client = _factory.CreateClient();
+            var token = GenerateJwtToken();
 
+            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
             // Act
             var response = await client.GetAsync("/api/motorcycles");
 
