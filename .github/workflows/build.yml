@@ -32,7 +32,7 @@ jobs:
           sonarProjectName: MotoHub
           sonarOrganization: ivega123
           dotnetTestArguments: '--logger trx --collect:"XPlat Code Coverage" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover'
-          sonarBeginArguments: /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx" /d:sonar.coverage.exclusions="**/Migrations/*" /d:sonar.exclusions="**/Migrations/*"
+          sonarBeginArguments: /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" /d:sonar.cs.vstest.reportsPaths="**/TestResults/*.trx" /d:sonar.coverage.exclusions="**/Migrations/*, **/CrossCutting/**/*, **/RabbitMQ/**/*" /d:sonar.exclusions="**/Migrations/*, **/CrossCutting/**/*, **/RabbitMQ/**/*"
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
