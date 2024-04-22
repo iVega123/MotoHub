@@ -1,10 +1,13 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using Moq;
+using MotoHub.CrossCutting;
 using MotoHub.DTOs;
+using MotoHub.Entities;
 using MotoHub.Models;
 using MotoHub.Repositories;
 using MotoHub.Services;
+using MotoHub.Services.RabbitMQ;
 
 namespace MotoHubTests.Unit.Services
 {
@@ -16,8 +19,8 @@ namespace MotoHubTests.Unit.Services
             // Arrange
             var motorcycles = new List<Motorcycle>
             {
-                new Motorcycle { Id = 1, LicensePlate = "ABC123", Model = "Honda", Year = 2020 },
-                new Motorcycle { Id = 2, LicensePlate = "DEF456", Model = "Yamaha", Year = 2019 }
+                new Motorcycle { Id = Guid.NewGuid().ToString(), LicensePlate = "ABC123", Model = "Honda", Year = 2020 },
+                new Motorcycle { Id = Guid.NewGuid().ToString(), LicensePlate = "DEF456", Model = "Yamaha", Year = 2019 }
             };
 
             var motorcycleDTOs = new List<MotorcycleDTO>
@@ -31,10 +34,15 @@ namespace MotoHubTests.Unit.Services
                       .Returns(motorcycleDTOs);
 
             var mockRepository = new Mock<IMotorcycleRepository>();
+
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+
             mockRepository.Setup(repo => repo.GetAll())
                           .Returns(motorcycles);
 
-            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object);
+            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object, mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
             var result = service.GetAllMotorcycles();
@@ -48,25 +56,28 @@ namespace MotoHubTests.Unit.Services
         }
 
         [Fact]
-        public void GetMotorcycleByLicensePlate_ExistingLicensePlate_ReturnsMotorcycleDTO()
+        public async void GetMotorcycleByLicensePlate_ExistingLicensePlate_ReturnsMotorcycleDTO()
         {
             // Arrange
             var existingLicensePlate = "ABC123";
-            var existingMotorcycle = new Motorcycle { Id = 1, LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
+            var existingMotorcycle = new Motorcycle { Id = Guid.NewGuid().ToString(), LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
             var motorcycleDTO = new MotorcycleDTO { LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
 
             var mockMapper = new Mock<IMapper>();
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+
+            var mockCrossCutting = new Mock<IRentalOperationService>();
             mockMapper.Setup(m => m.Map<MotorcycleDTO>(It.IsAny<Motorcycle>()))
                       .Returns(motorcycleDTO);
 
             var mockRepository = new Mock<IMotorcycleRepository>();
-            mockRepository.Setup(repo => repo.GetByLicensePlate(existingLicensePlate))
-                          .Returns(existingMotorcycle);
+            mockRepository.Setup(repo => repo.GetByLicensePlateAsync(existingLicensePlate))
+                          .ReturnsAsync(existingMotorcycle);
 
-            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object);
+            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object, mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
-            var result = service.GetMotorcycleByLicensePlate(existingLicensePlate);
+            var result = await service.GetMotorcycleByLicensePlateAsync(existingLicensePlate);
 
             // Assert
             Assert.NotNull(result);
@@ -78,7 +89,7 @@ namespace MotoHubTests.Unit.Services
         {
             // Arrange
             var motorcycleDTO = new MotorcycleDTO { LicensePlate = "ABC123", Model = "Honda", Year = 2020 };
-            var createdMotorcycle = new Motorcycle { Id = 1, LicensePlate = "ABC123", Model = "Honda", Year = 2020 };
+            var createdMotorcycle = new Motorcycle { Id = Guid.NewGuid().ToString(), LicensePlate = "ABC123", Model = "Honda", Year = 2020 };
 
             var mockMapper = new Mock<IMapper>();
             mockMapper.Setup(m => m.Map<Motorcycle>(It.IsAny<MotorcycleDTO>()))
@@ -86,7 +97,11 @@ namespace MotoHubTests.Unit.Services
 
             var mockRepository = new Mock<IMotorcycleRepository>();
 
-            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object);
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+
+            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object, mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
             service.CreateMotorcycle(motorcycleDTO);
@@ -97,29 +112,36 @@ namespace MotoHubTests.Unit.Services
         }
 
         [Fact]
-        public void UpdateMotorcycle_ExistingMotorcycle_UpdatesMotorcycle()
+        public async Task UpdateMotorcycle_ExistingMotorcycle_UpdatesMotorcycle()
         {
             // Arrange
             var existingLicensePlate = "ABC123";
-            var existingMotorcycle = new Motorcycle { Id = 1, LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
-            var updatedMotorcycleDTO = new MotorcycleDTO { LicensePlate = existingLicensePlate, Model = "Yamaha", Year = 2021 };
-
+            var newLicensePlate = "XYZ987";
+            var existingMotorcycle = new Motorcycle { Id = Guid.NewGuid().ToString(), LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
             var mockMapper = new Mock<IMapper>();
-            mockMapper.Setup(m => m.Map<MotorcycleDTO>(It.IsAny<Motorcycle>()))
-                      .Returns(updatedMotorcycleDTO);
-
             var mockRepository = new Mock<IMotorcycleRepository>();
-            mockRepository.Setup(repo => repo.GetByLicensePlate(existingLicensePlate))
-                          .Returns(existingMotorcycle);
+            mockRepository.Setup(repo => repo.GetByLicensePlateAsync(existingLicensePlate))
+                          .ReturnsAsync(existingMotorcycle);
+            mockRepository.Setup(repo => repo.Update(existingMotorcycle))
+                          .Verifiable("Repository update was not called");
 
-            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object);
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+
+            var mockMessagingPublisherService = new Mock<IMessagingPublisherService>();
+            mockMessagingPublisherService.Setup(p => p.PublishLicenceUpdate(It.Is<LicencePlateRabbitMQEntity>(m =>
+                m.newLicencePlate == newLicensePlate && m.oldLicencePlate == existingLicensePlate)))
+                .Verifiable("Message was not published correctly");
+
+            var service = new MotorcycleService(mockRepository.Object, mockMapper.Object, mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
-            service.UpdateMotorcycle(existingLicensePlate, updatedMotorcycleDTO);
+            await service.UpdateMotorcycleAsync(existingLicensePlate, newLicensePlate);
 
             // Assert
-            Assert.Equal("Yamaha", existingMotorcycle.Model);
-            Assert.Equal(2021, existingMotorcycle.Year);
+            mockRepository.Verify();
+
+            Assert.Equal(newLicensePlate, existingMotorcycle.LicensePlate);
         }
 
         [Fact]
@@ -127,13 +149,15 @@ namespace MotoHubTests.Unit.Services
         {
             // Arrange
             var existingLicensePlate = "ABC123";
-            var existingMotorcycle = new Motorcycle { Id = 1, LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
+            var existingMotorcycle = new Motorcycle { Id = Guid.NewGuid().ToString(), LicensePlate = existingLicensePlate, Model = "Honda", Year = 2020 };
 
             var mockRepository = new Mock<IMotorcycleRepository>();
-            mockRepository.Setup(repo => repo.GetByLicensePlate(existingLicensePlate))
-                          .Returns(existingMotorcycle);
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+            mockRepository.Setup(repo => repo.GetByLicensePlateAsync(existingLicensePlate))
+                          .ReturnsAsync(existingMotorcycle);
 
-            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>());
+            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>(), mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
             service.DeleteMotorcycle(existingLicensePlate);
@@ -152,7 +176,9 @@ namespace MotoHubTests.Unit.Services
             mockRepository.Setup(repo => repo.LicensePlateExists(existingLicensePlate))
                           .Returns(true);
 
-            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>());
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>(), mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
             var result = service.LicensePlateExists(existingLicensePlate);
@@ -168,10 +194,12 @@ namespace MotoHubTests.Unit.Services
             var motorcycleDTO = new MotorcycleDTO { LicensePlate = "ABC123", Model = "Honda", Year = 2020 };
 
             var mockRepository = new Mock<IMotorcycleRepository>();
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+            var mockCrossCutting = new Mock<IRentalOperationService>();
             mockRepository.Setup(repo => repo.LicensePlateExists(motorcycleDTO.LicensePlate))
                           .Returns(true);
 
-            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>());
+            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>(), mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
             var result = Record.Exception(() => service.CreateMotorcycle(motorcycleDTO));
@@ -181,20 +209,22 @@ namespace MotoHubTests.Unit.Services
         }
 
         [Fact]
-        public void UpdateMotorcycle_NonExistingMotorcycle_DoesNotUpdate()
+        public async void UpdateMotorcycle_NonExistingMotorcycle_DoesNotUpdate()
         {
             // Arrange
             var nonExistingLicensePlate = "XYZ789";
-            var updatedMotorcycleDTO = new MotorcycleDTO { LicensePlate = nonExistingLicensePlate, Model = "Yamaha", Year = 2021 };
+            var updatedMotorcycleDTO = nonExistingLicensePlate;
 
             var mockRepository = new Mock<IMotorcycleRepository>();
-            mockRepository.Setup(repo => repo.GetByLicensePlate(nonExistingLicensePlate))
-                          .Returns((Motorcycle)null);
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+            mockRepository.Setup(repo => repo.GetByLicensePlateAsync(nonExistingLicensePlate))
+                          .ReturnsAsync((Motorcycle)null);
 
-            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>());
+            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>(), mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
-            service.UpdateMotorcycle(nonExistingLicensePlate, updatedMotorcycleDTO);
+            await service.UpdateMotorcycleAsync(nonExistingLicensePlate, updatedMotorcycleDTO);
 
             // Assert
             mockRepository.Verify(repo => repo.Update(It.IsAny<Motorcycle>()), Times.Never);
@@ -207,16 +237,18 @@ namespace MotoHubTests.Unit.Services
             var nonExistingLicensePlate = "XYZ789";
 
             var mockRepository = new Mock<IMotorcycleRepository>();
-            mockRepository.Setup(repo => repo.GetByLicensePlate(nonExistingLicensePlate))
-                          .Returns((Motorcycle)null);
+            var mockMessagingPublish = new Mock<IMessagingPublisherService>();
+            var mockCrossCutting = new Mock<IRentalOperationService>();
+            mockRepository.Setup(repo => repo.GetByLicensePlateAsync(nonExistingLicensePlate))
+                          .ReturnsAsync((Motorcycle)null);
 
-            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>());
+            var service = new MotorcycleService(mockRepository.Object, Mock.Of<IMapper>(), mockMessagingPublish.Object, mockCrossCutting.Object);
 
             // Act
             service.DeleteMotorcycle(nonExistingLicensePlate);
 
             // Assert
-            mockRepository.Verify(repo => repo.Delete(It.IsAny<int>()), Times.Never);
+            mockRepository.Verify(repo => repo.Delete(It.IsAny<string>()), Times.Never);
         }
     }
 }

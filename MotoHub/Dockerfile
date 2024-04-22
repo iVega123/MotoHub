@@ -3,21 +3,21 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
+EXPOSE 8100
+EXPOSE 8101
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["MotoHub/MotoHub.csproj", "MotoHub/"]
+COPY ["MotoHub/MotoHub/MotoHub.csproj", "MotoHub/"]
 RUN dotnet restore "./MotoHub/MotoHub.csproj"
 COPY . .
 WORKDIR "/src/MotoHub"
-RUN dotnet build "./MotoHub.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "./MotoHub/MotoHub.csproj" -c $BUILD_CONFIGURATION -o /app/build
 
 FROM build AS publish
 ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./MotoHub.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "./MotoHub/MotoHub.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 FROM base AS final
 WORKDIR /app
