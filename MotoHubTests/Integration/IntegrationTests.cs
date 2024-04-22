@@ -233,7 +233,7 @@ namespace MotoHubTests.Integration
 
             var initialResponse = await client.PostAsync("/api/motorcycles", content);
 
-            content = new StringContent(JsonConvert.SerializeObject(motorcycle), Encoding.UTF8, "application/json"); // recreate the content to avoid disposing issues
+            content = new StringContent(JsonConvert.SerializeObject(motorcycle), Encoding.UTF8, "application/json");
             var duplicateResponse = await client.PostAsync("/api/motorcycles", content);
 
             Assert.Equal(HttpStatusCode.OK, initialResponse.StatusCode);
@@ -246,7 +246,7 @@ namespace MotoHubTests.Integration
         {
             // Arrange
             var client = _factory.CreateClient();
-            var invalidToken = GenerateInvalidJwtToken();  // Generate an intentionally invalid token
+            var invalidToken = GenerateInvalidJwtToken();
 
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", invalidToken);
 
