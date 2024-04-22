@@ -68,7 +68,8 @@ namespace MotoHubTests.Integration
 
                 var integrationTestConfig = new Dictionary<string, string>
                 {
-                    {"JwtKey", "pnXhunyWll1LgERT86wXwMH5I6ieQC2M"}
+                    {"JwtKey", "pnXhunyWll1LgERT86wXwMH5I6ieQC2M"},
+                    {"MotoHubApiKey", "" }
                 };
 
                 configBuilder.Sources.Clear();

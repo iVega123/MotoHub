@@ -241,6 +241,65 @@ namespace MotoHubTests.Integration
             Assert.Equal(HttpStatusCode.Conflict, duplicateResponse.StatusCode);
         }
 
+        [Fact]
+        public async Task GetAll_WithInvalidToken_ReturnsUnauthorized()
+        {
+            // Arrange
+            var client = _factory.CreateClient();
+            var invalidToken = GenerateInvalidJwtToken();  // Generate an intentionally invalid token
+
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", invalidToken);
+
+            // Act
+            var response = await client.GetAsync("/api/motorcycles");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task GetAll_WithInvalidApiKey_ReturnsUnauthorized()
+        {
+            // Arrange
+            var client = _factory.CreateClient();
+            var invalidApiKey = GenerateInvalidApiKey();
+
+            client.DefaultRequestHeaders.Add("X-API-KEY", invalidApiKey);
+
+            // Act
+            var response = await client.GetAsync("/api/motorcycles");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        private string GenerateInvalidApiKey()
+        {
+            return "30cee9e2-9a38-4aad-8fe6-0398bd7f2a25";
+        }
+
+        private string GenerateInvalidJwtToken()
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, "InvalidUser"),
+                new Claim(ClaimTypes.Email, "invalid@example.com"),
+                new Claim(ClaimTypes.Role, "Guest")
+            };
+
+            var invalidKey = "ThisIsAnInvalidKeyForTestingas@asda"; 
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(invalidKey));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var token = new JwtSecurityToken(
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(-1),
+                signingCredentials: creds);
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            return tokenHandler.WriteToken(token);
+        }
+
 
         private string GenerateJwtToken()
         {
